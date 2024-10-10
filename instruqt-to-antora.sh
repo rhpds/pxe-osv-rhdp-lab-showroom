@@ -5,6 +5,8 @@
 INSTRUQT_ROOT=/Users/jmaltin/Development/pxe-osv-rhdp-lab/instruqt-source/openshift-lab-preview/
 DEST_ROOT=/Users/jmaltin/Development/pxe-osv-rhdp-lab-showroom/
 
+rm -rf ${DEST_ROOT}/content/modules/
+
 ####
 # Move around the files, do the asciidoc conversion
 ####
@@ -55,12 +57,16 @@ echo "title: ${title}"
 my_url=$(yq '.url' ${INSTRUQT_ROOT}/track.yml)
 url=${my_url/#null/'https://demo.redhat.comx'}
 echo "url: ${url}"
+echo "adoc_files: ${adoc_files[0]}"
+index_page=$(echo "${adoc_files[0]}" | xargs basename)
+echo "index_page: ${index_page}"
 
 # Make the antora site.yml
-yq -i ".site.title = \"${title}\" | .site.url = \"${url}\"" ${DEST_ROOT}/default-site.yml
+echo "Make default-site.yml"
+yq -i ".site.title = \"${title}\" | .site.url = \"${url}\" | .site.start_page = \"modules::${index_page}\"" ${DEST_ROOT}/default-site.yml
 
 # content/antora.yml
-
+echo "Make content/antora.yml"
 yq -i ".title = \"${title}\"" ${DEST_ROOT}/content/antora.yml
 
 # content/modules/ROOT/nav.adoc
