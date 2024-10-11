@@ -1,9 +1,8 @@
 name: modules
-title: Default Title
+title: Openshift Lab Preview
 version: master
 nav:
   - modules/ROOT/nav.adoc
-
 asciidoc:
   attributes:
     lab_name: "I'm the lab_name var"
@@ -15,5 +14,11 @@ asciidoc:
     ssh_password: devops
     ssh_command: ssh someone@example.com
     page-links:
-    - url: https://redhat.com
-      text: Red Hat
+      - url: https://redhat.com
+        text: Red Hat
+    kubeadmin_password: kubeadmin_password
+    minio_access_key: minio_access_key
+    minio_secret_key: minio_secret_key
+    bucketname: bucketname
+    minio_endpoint: minio_endpoint
+    bucketname_objectlock: bucketname_objectlock

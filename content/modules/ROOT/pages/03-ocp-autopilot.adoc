@@ -1,0 +1,165 @@
+= Portworx Autopilot on OpenShift
+:_sandbox_id:
+:difficulty: basic
+:id: o6u7i6aetlhb
+:notes: [{"type"=>"text", "contents"=>"Let's automatically manage volume space with autopilot"}]
+:slug: ocp-autopilot
+:tabs: [{"id"=>"yvnoxkfjvjmu", "title"=>"Terminal", "type"=>"terminal", "hostname"=>"cloud-client", "cmd"=>"su - root"}, {"id"=>"yzawo3l64gka", "title"=>"OpenShift Console", "type"=>"website", "url"=>"https://console-openshift-console.apps.ocp.${_SANDBOX_ID}.instruqt.pxbbq.com", "new_window"=>true}]
+:teaser: Portworx Autopilot on OpenShift
+:timelimit: 600
+:type: challenge
+
+== Scenario - Automated Volume Expansion using Portworx Autopilot
+
+Portworx Autopilot is a rule-based engine that responds to changes from a monitoring source.
+Autopilot allows you to specify monitoring conditions along with actions it should take when those conditions occur.
+
+[discrete]
+==== Reminder: Accessing the Red Hat OpenShift Console
+
+To connect to the console, click on the `OpenShift Console` tab above.
+
+____
+IMPORTANT:
+ The `OpenShift Console` tab will open in a new browser window.
+____
+
+We can then log in with the following credentials:
+
+Username: `kubeadmin` Password: `{kubeadmin_password}`
+
+[discrete]
+==== Task 1: Create Autopilot Rule
+
+Autopilot rules allow users to create IFTTT (IF This Then That) rules, where Autopilot will monitor for a condition and then perform an action on your behalf.
+
+Let's create a simple rule that will monitor persistent volumes associated with objects that have the `app: disk-filler` label and in namespaces that have the label `type: db`.
+First, let's take a look at the YAML for the rule and call out the important lines:
+
+[,bash,subs="attributes",role="execute"]
+----
+ccat autopilotrule.yaml
+----
+
+The rule displayed will:
+
+* *_Line 9:_* Target PVCs with the Kubernetes label `app: disk-filler`
+* *_Line 13:_* Target PVCs in namespaces with the label `type: db`
+* *_Lines 18-21:_* Monitor if capacity usage grows to or above 30%
+* *_Line 28:_* Automatically grow the volume and underlying filesystem by 100% of the current volume size if usage above 30% is detected
+* *_Line 30:_* Not grow the volume to more than 20Gi
+
+Apply the yaml to create the Portworx Autopilot rule:
+
+[,bash,subs="attributes",role="execute"]
+----
+oc create -f autopilotrule.yaml
+----
+
+[discrete]
+==== Task 2: Identify Namespaces Selected
+
+Since our Portworx Autopilot rule only targets namespaces that have the label `type: db`, let's make sure our namespace has the proper label:
+
+[,bash,subs="attributes",role="execute"]
+----
+oc get ns -l type=db
+----
+
+There is our `autopilot` namespace in the filtered results - we are good to go!
+
+[discrete]
+==== Task 3: Deploy PVCs for Disk Filler
+
+Review the yaml for the volume, and note the label `app: disk-filler` on *_Line 6_*:
+
+[,bash,subs="attributes",role="execute"]
+----
+ccat disk-filler-pvc.yaml
+----
+
+Then let's apply it to deploy our PVC:
+
+[,bash,subs="attributes",role="execute"]
+----
+oc create -f disk-filler-pvc.yaml -n autopilot
+----
+
+Ensure that the PVC is created and bound:
+
+[,bash,subs="attributes",role="execute"]
+----
+oc get pvc -n autopilot
+----
+
+____
+IMPORTANT:
+ Note that the original size of the PVC for our data volume is 10Gi.
+____
+
+[discrete]
+==== Task 4: Deploy the Disk Filler Pod
+
+Review the yaml for our busybox pod that will fill our volume with data.
+On *_Line 27_* you can see we'll use a simple `dd` command to fill the disk by generating random data:
+
+[,bash,subs="attributes",role="execute"]
+----
+ccat disk-filler.yaml
+----
+
+And then deploy the pod:
+
+[,bash,subs="attributes",role="execute"]
+----
+oc create -f disk-filler.yaml -n autopilot
+----
+
+[discrete]
+==== Task 5: Observe the Portworx Autopilot events
+
+Run the following command to observe the state changes for Portworx Autopilot:
+
+[,bash,subs="attributes",role="execute"]
+----
+watch oc get events --field-selector \
+ involvedObject.kind=AutopilotRule,involvedObject.name=volume-resize \
+ --all-namespaces --sort-by .lastTimestamp -o custom-columns=MESSAGE:.message
+----
+
+You will see Portworx Autopilot move through the following states as it monitors volumes and takes actions defined in Portworx Autopilot rules:
+
+* *_Initializing_* (Detected a volume to monitor via applied rule conditions)
+* *_Normal_* (Volume is within defined conditions and no action is necessary)
+* *_Triggered_* (Volume is no longer within defined conditions and action is necessary)
+* *_ActiveActionsPending_* (Corrective action is necessary but not executed yet)
+* *_ActiveActionsInProgress_* (Corrective action is under execution)
+* *_ActiveActionsTaken_* (Corrective action is complete)
+
+Once you see ActiveActionsTaken in the event output, press `CTRL+C` to exit the watch command.
+
+[discrete]
+==== Task 6: Verify the Volume Expansion
+
+Now let's take a look at our PVC - note the automatic expansion of the volume occurred with no human interaction and no application interruption:
+
+[,bash,subs="attributes",role="execute"]
+----
+oc get pvc -n autopilot
+----
+
+____
+IMPORTANT:
+ You should now see the data volume has been doubled from the original capacity of 10Gi when the PVC was initially created.
+____
+
+You've just configured Portworx Autopilot and observed how it can perform automated capacity management based on rules you configure, and be able to "right size" your underlying persistent storage as it is needed!
+
+== Cleanup
+
+Run the following script to clean up demo resources:
+
+[,bash,subs="attributes",role="execute"]
+----
+./cleanup.sh
+----
