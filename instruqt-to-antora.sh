@@ -6,6 +6,7 @@ INSTRUQT_ROOT=/Users/jmaltin/Development/pxe-osv-rhdp-lab/instruqt-source/opensh
 DEST_ROOT=/Users/jmaltin/Development/pxe-osv-rhdp-lab-showroom/
 
 rm -rf ${DEST_ROOT}/content/modules/
+rm -rf ${DEST_ROOT}/{www,.cache}
 
 ####
 # Move around the files, do the asciidoc conversion
@@ -13,7 +14,7 @@ rm -rf ${DEST_ROOT}/content/modules/
 
 # Setup directory structure
 mkdir -p ${DEST_ROOT}/content/modules/ROOT/{pages,assets/images}
-mkdir -p ${DEST_ROOT}/content/libs/
+mkdir -p ${DEST_ROOT}/content/lib/
 
 # Assume single module.
 # Convert the markdown files from markdown to asciidoc, putting the output in the correct place
@@ -85,3 +86,22 @@ do
   dest_path=$(path_to_adoc_path $f | xargs basename )
   echo "* xref:${dest_path}[${title}]" >> ${DEST_ROOT}/content/modules/ROOT/nav.adoc
 done
+
+####
+# Now the annoying part, clean up the asciidoc files
+####
+
+# Add default asciidoc attributes
+
+for x in kubeadmin_password minio_access_key minio_secret_key bucketname minio_endpoint bucketname_objectlock
+do
+  yq -i ".asciidoc.attributes.$x = \"${x}\"" ${DEST_ROOT}/content/antora.yml
+done
+
+
+# stuff I can do globally
+
+# ,bash,run to ,bash,subs="attributes",role="execute"
+perl -pi -e 's/,bash,run/,bash,subs="attributes",role="execute"/g' ${DEST_ROOT}/content/modules/ROOT/pages/*.adoc
+perl -pi -e 's/\[\[ Instruqt-Var key="(.*?)".*?\]\]/{\L\1}/g' ${DEST_ROOT}/content/modules/ROOT/pages/*.adoc
+perl -pi -e 's/\[!IMPORTANT\]/IMPORTANT:\n/g' ${DEST_ROOT}/content/modules/ROOT/pages/*.adoc
